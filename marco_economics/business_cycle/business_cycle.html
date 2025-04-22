@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Business Cycle Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .header {
+            text-align: center;
+            margin: 20px 0;
+            color: #2c3e50;
+        }
+        .explanation {
+            max-width: 800px;
+            margin: 0 auto 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .chart-container {
+            width: 800px;
+            margin: 20px auto;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Macroeconomic Business Cycle</h1>
+        <h3>Visualizing Economic Expansions and Contractions</h3>
+    </div>
+
+    <div class="explanation">
+        <p>This visualization demonstrates the four phases of the business cycle:</p>
+        <ul>
+            <li><strong>Expansion</strong>: Period of economic growth (GDP rising)</li>
+            <li><strong>Peak</strong>: The height of economic expansion</li>
+            <li><strong>Contraction</strong>: Period of economic decline (GDP falling)</li>
+            <li><strong>Trough</strong>: The lowest point of economic contraction</li>
+        </ul>
+        <p>Learn more about business cycles from these resources:
+            <a href="https://www.investopedia.com/terms/b/businesscycle.asp" target="_blank">Investopedia</a> | 
+            <a href="https://www.econlib.org/library/Enc/BusinessCycles.html" target="_blank">EconLib</a>
+        </p>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="businessCycleChart"></canvas>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4CAF50"></div>
+                <span>Expansion</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #F44336"></div>
+                <span>Contraction</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FFC107"></div>
+                <span>Peak</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2196F3"></div>
+                <span>Trough</span>
+            </div>
+        </div>
+    </div>
+
+<script>
+$(document).ready(function() {
+    const ctx = document.getElementById('businessCycleChart').getContext('2d');
+    
+    // Sample data and phase detection
+    const dataPoints = [100, 120, 110, 80, 70, 80, 90, 120];
+    const phases = [];
+    
+    // Detect phases for each data point
+    dataPoints.forEach((value, index) => {
+        if (value >= 120) {
+            phases.push('peak');
+        } else if (value <= 70) {
+            phases.push('trough');
+        } else if (index === 0) {
+            phases.push('expansion');
+        } else {
+            phases.push(value > dataPoints[index-1] ? 'expansion' : 'contraction');
+        }
+    });
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q1', 'Q2', 'Q3', 'Q4'],
+            datasets: [{
+                label: 'Economic Activity',
+                data: dataPoints,
+                borderWidth: 3,
+                fill: false,
+                tension: 0.4,
+                segment: {
+                    borderColor: ctx => {
+                        const prev = ctx.p0.parsed.y;
+                        const next = ctx.p1.parsed.y;
+                        return next > prev ? '#4CAF50' : '#F44336';
+                    }
+                },
+                pointBackgroundColor: dataPoints.map((v, i) => 
+                    phases[i] === 'peak' ? '#FFC107' :
+                    phases[i] === 'trough' ? '#2196F3' : 'transparent'
+                ),
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (items) => `Quarter: ${items[0].label}`,
+                        label: (context) => {
+                            const phase = phases[context.dataIndex];
+                            return `Phase: ${phase.charAt(0).toUpperCase() + phase.slice(1)}\nValue: ${context.parsed.y}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    title: { display: true, text: 'Economic Activity Index' }
+                }
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
