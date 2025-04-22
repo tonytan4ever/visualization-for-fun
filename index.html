@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome To Tony's Visualization Playground</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 2rem;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        .project-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .project-card h2 {
+            margin-top: 0;
+            color: #3498db;
+            font-size: 1.2rem;
+        }
+        .project-card p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            color: #95a5a6;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Visualization Playground</h1>
+        
+        <div class="project-grid">
+            <!-- Example project card - duplicate and modify for each project -->
+            <a href="/project-1" class="project-card">
+                <h2>Project 1</h2>
+                <p>A brief description of what this visualization demonstrates</p>
+            </a>
+            
+            <!-- Add more project cards here as you create new visualizations -->
+            <!-- <a href="/project-2" class="project-card">
+                <h2>Project 2</h2>
+                <p>Description</p>
+            </a> -->
+        </div>
+        
+        <footer>
+            Hosted on CloudFlare Pages
+        </footer>
+    </div>
+</body>
+</html>
