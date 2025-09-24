@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Triangle Framework</title>
+    <style>
+        :root {
+            --thoughts-color: #4a86e8;
+            --actions-color: #6aa84f;
+            --feelings-color: #e06666;
+            --text-color: #333;
+            --light-bg: #f9f9f9;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--light-bg);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+        
+        .diagram-container {
+            display: flex;
+            justify-content: center;
+            margin: 40px 0;
+        }
+        
+        .triangle-container {
+            position: relative;
+            width: 400px;
+            height: 350px;
+        }
+        
+        .triangle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 260px;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            background: #ecf0f1;
+            border: 2px solid #bdc3c7;
+        }
+        
+        .node {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 15px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        .thoughts {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--thoughts-color);
+        }
+        
+        .actions {
+            bottom: 10px;
+            left: 20px;
+            background-color: var(--actions-color);
+        }
+        
+        .feelings {
+            bottom: 10px;
+            right: 20px;
+            background-color: var(--feelings-color);
+        }
+        
+        .control-indicator {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .arrows {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+        
+        .arrow {
+            position: absolute;
+            width: 2px;
+            height: 100px;
+            background: #7f8c8d;
+            transform-origin: bottom center;
+        }
+        
+        .arrow:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 10px solid #7f8c8d;
+        }
+        
+        .arrow-1 {
+            top: 110px;
+            left: 190px;
+            transform: rotate(60deg);
+        }
+        
+        .arrow-2 {
+            top: 110px;
+            left: 190px;
+            transform: rotate(-60deg);
+        }
+        
+        .arrow-3 {
+            top: 180px;
+            left: 190px;
+            transform: rotate(180deg);
+        }
+        
+        .content-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 2px solid;
+            padding-bottom: 10px;
+        }
+        
+        .thoughts-card h2 {
+            border-color: var(--thoughts-color);
+        }
+        
+        .actions-card h2 {
+            border-color: var(--actions-color);
+        }
+        
+        .feelings-card h2 {
+            border-color: var(--feelings-color);
+        }
+        
+        .reframing-card h2 {
+            border-color: #9b59b6;
+        }
+        
+        .controllability {
+            margin: 30px 0;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .control-scale {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .control-item {
+            text-align: center;
+            flex: 1;
+            padding: 10px;
+        }
+        
+        .control-bar {
+            height: 20px;
+            width: 100%;
+            background: #ecf0f1;
+            border-radius: 10px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s;
+        }
+        
+        .thoughts-control .control-fill {
+            width: 90%;
+            background: var(--thoughts-color);
+        }
+        
+        .actions-control .control-fill {
+            width: 100%;
+            background: var(--actions-color);
+        }
+        
+        .feelings-control .control-fill {
+            width: 30%;
+            background: var(--feelings-color);
+        }
+        
+        .references {
+            margin: 40px 0;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .references h2 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        .references ul {
+            padding-left: 20px;
+        }
+        
+        .references li {
+            margin-bottom: 10px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .content-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .triangle-container {
+                width: 300px;
+                height: 260px;
+            }
+            
+            .triangle {
+                width: 250px;
+                height: 216px;
+            }
+            
+            .node {
+                width: 100px;
+                height: 100px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Cognitive Triangle Framework</h1>
+        <p class="subtitle">Understanding the Interplay Between Thoughts, Actions, and Feelings</p>
+        <p>Based on Cognitive Behavioral Therapy (CBT) developed by Aaron Beck in the 1960s</p>
+    </header>
+    
+    <div class="diagram-container">
+        <div class="triangle-container">
+            <div class="triangle"></div>
+            <div class="arrows">
+                <div class="arrow arrow-1"></div>
+                <div class="arrow arrow-2"></div>
+                <div class="arrow arrow-3"></div>
+            </div>
+            <div class="node thoughts">
+                <span>Thoughts</span>
+                <div class="control-indicator">Highly Controllable</div>
+            </div>
+            <div class="node actions">
+                <span>Actions</span>
+                <div class="control-indicator">Directly Controllable</div>
+            </div>
+            <div class="node feelings">
+                <span>Feelings</span>
+                <div class="control-indicator">Indirectly Influenced</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="controllability">
+        <h2>Degree of Direct Control</h2>
+        <p>While all three components influence each other, we have different levels of direct control over each:</p>
+        
+        <div class="control-scale">
+            <div class="control-item actions-control">
+                <h3>Actions</h3>
+                <div class="control-bar">
+                    <div class="control-fill"></div>
+                </div>
+                <p>Directly controllable - We choose our behaviors</p>
+            </div>
+            <div class="control-item thoughts-control">
+                <h3>Thoughts</h3>
+                <div class="control-bar">
+                    <div class="control-fill"></div>
+                </div>
+                <p>Highly controllable - We can redirect our thinking</p>
+            </div>
+            <div class="control-item feelings-control">
+                <h3>Feelings</h3>
+                <div class="control-bar">
+                    <div class="control-fill"></div>
+                </div>
+                <p>Indirectly influenced - Emotions respond to thoughts/actions</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="content-section">
+        <div class="card thoughts-card">
+            <h2>Thoughts</h2>
+            <p>Our cognitive processes - the ideas, beliefs, and interpretations we have about ourselves, others, and the world.</p>
+            <p><strong>Controllability:</strong> We have significant control over our thoughts through cognitive techniques like reframing, challenging irrational beliefs, and mindfulness.</p>
+            <p><strong>Influence:</strong> Thoughts directly influence both our feelings (how we interpret events affects our emotions) and our actions (our beliefs drive our behaviors).</p>
+        </div>
+        
+        <div class="card actions-card">
+            <h2>Actions</h2>
+            <p>Our behaviors - what we do or don't do in response to situations.</p>
+            <p><strong>Controllability:</strong> Actions are directly under our control. We choose how to behave, even when emotions are strong.</p>
+            <p><strong>Influence:</strong> Actions impact our feelings (behavioral activation can improve mood) and our thoughts (acting against negative beliefs can change them).</p>
+        </div>
+        
+        <div class="card feelings-card">
+            <h2>Feelings</h2>
+            <p>Our emotional responses - the subjective experience of emotions like joy, sadness, anger, or anxiety.</p>
+            <p><strong>Controllability:</strong> Feelings are not directly controllable but can be influenced indirectly through changing thoughts and actions.</p>
+            <p><strong>Influence:</strong> Feelings affect our thoughts (emotional reasoning) and our actions (emotion-driven behaviors).</p>
+        </div>
+        
+        <div class="card reframing-card">
+            <h2>Cognitive Reframing for Stress Management</h2>
+            <p>Cognitive reframing is a CBT technique that involves identifying and changing the way situations are viewed.</p>
+            <p><strong>How it works:</strong> By consciously shifting our perspective on stressful situations, we can alter our emotional response and subsequent actions.</p>
+            <p><strong>Benefits:</strong> Research shows that reframing stress can improve performance, enhance problem-solving, and reduce negative health impacts of stress.</p>
+            <p>Instead of viewing stress as debilitating, reframing it as a challenge can mobilize resources and improve outcomes.</p>
+        </div>
+    </div>
+    
+    <div class="references">
+        <h2>References & Further Reading</h2>
+        <ul>
+            <li>Beck, A. T. (1979). <em>Cognitive Therapy and the Emotional Disorders</em>. Meridian.</li>
+            <li>Crum, A. J., Salovey, P., & Achor, S. (2013). Rethinking stress: The role of mindsets in determining the stress response. <em>Journal of Personality and Social Psychology</em>, 104(4), 716–733.</li>
+            <li>Jamieson, J. P., Nock, M. K., & Mendes, W. B. (2012). Mind over matter: Reappraising arousal improves cardiovascular and cognitive responses to stress. <em>Journal of Experimental Psychology: General</em>, 141(3), 417–422.</li>
+            <li>Lazarus, R. S., & Folkman, S. (1984). <em>Stress, Appraisal, and Coping</em>. Springer Publishing Company.</li>
+            <li>McGonigal, K. (2015). <em>The Upside of Stress: Why Stress Is Good for You, and How to Get Good at It</em>. Avery.</li>
+        </ul>
+    </div>
+    
+    <footer>
+        <p>Cognitive Triangle Framework | Based on Cognitive Behavioral Therapy by Aaron Beck</p>
+        <p>This diagram illustrates the interconnected relationship between thoughts, actions, and feelings.</p>
+    </footer>
+
+    <script>
+        // Simple interactivity for the nodes
+        document.querySelectorAll('.node').forEach(node => {
+            node.addEventListener('click', function() {
+                const type = this.classList[1]; // thoughts, actions, or feelings
+                const cards = document.querySelectorAll('.card');
+                
+                // Remove highlight from all cards
+                cards.forEach(card => {
+                    card.style.transform = 'scale(1)';
+                    card.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+                });
+                
+                // Highlight the corresponding card
+                const correspondingCard = document.querySelector(`.${type}-card`);
+                if (correspondingCard) {
+                    correspondingCard.style.transform = 'scale(1.02)';
+                    correspondingCard.style.boxShadow = '0 5px 15px rgba(0,0,0,0.2)';
+                    
+                    // Scroll to the card
+                    correspondingCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
