@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KMP — LPS (π) Builder Visualizer</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111831;
+      --ink: #e9eefc;
+      --muted: #94a3b8;
+      --accent: #7c3aed;
+      --accent-2: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --good: #22c55e;
+      --card: #0f172a;
+      --chip: #1f2a44;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink); background: linear-gradient(180deg, #0b1020 0%, #0b1226 100%);
+      display: grid; grid-template-rows: auto 1fr; gap: 12px; padding: 18px;
+    }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.3px; }
+    .panel { background: var(--panel); border: 1px solid #1f2a44; border-radius: 14px; padding: 14px; }
+    .grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 14px; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { font-size: 12px; color: var(--muted); }
+    input[type="text"] { width: 100%; padding: 10px 12px; background: var(--card); color: var(--ink);
+      border: 1px solid #223056; border-radius: 10px; font-size: 14px; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button { border: 0; border-radius: 10px; padding: 10px 12px; color: white; cursor: pointer; font-weight: 600; }
+    .primary { background: var(--accent); }
+    .ghost { background: #1e293b; }
+    .danger { background: var(--bad); }
+    .slim { padding: 8px 10px; font-size: 12px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .board { display: grid; gap: 14px; }
+
+    .row { display: grid; gap: 6px; }
+    .row .label { font-size: 12px; color: var(--muted); }
+    .tape { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: var(--card); border: 1px solid #1f2a44; border-radius: 12px; }
+    .cell { position: relative; min-width: 28px; height: 36px; display: grid; place-items: center; padding: 0 6px;
+      background: var(--chip); border: 1px solid #263860; border-radius: 8px; font-weight: 700; }
+    .cell .idx { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); }
+    .cell.active { outline: 2px solid var(--accent); }
+    .cell.match { background: #073d2b; border-color: #147a52; }
+    .cell.mismatch { background: #3a0e14; border-color: #7a1423; }
+    .cell.pattern { background: #2b1f55; border-color: #5b3ebf; }
+    .cursor { position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; padding: 2px 6px; border-radius: 6px; background: var(--accent);
+    }
+    .cursor.j { background: var(--warn); }
+
+    .codebox { background: #0a1428; border: 1px solid #1f2a44; border-radius: 14px; padding: 0; overflow: hidden; height: 650px; }
+    .codebox header { display:flex; justify-content: space-between; align-items:center; padding:10px 12px; border-bottom: 1px solid #1f2a44; background:#0f1b36; }
+    .codebox header .title { font-size: 12px; color: var(--muted); }
+    .codebox .code { height: 610px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 1.45; }
+    .code-line { display: grid; grid-template-columns: 48px 1fr; gap: 8px; padding: 6px 12px; }
+    .code-line:nth-child(odd) { background: #0b1a33; }
+    .gutter { color:#5b6b8c; text-align: right; padding-right: 6px; }
+    .src { color:#dbe7ff; white-space: pre; }
+    .code-line.active { background: #1b2650 !important; box-shadow: inset 0 0 0 1px #33457a; }
+    .badge { background:#1e293b; color:#9fb4d9; border:1px solid #2b3b65; border-radius: 8px; padding:4px 8px; font-size:11px; }
+    .seg { display:flex; gap:6px; align-items:center; }
+
+    .examples { display:flex; flex-wrap: wrap; gap:6px; margin-top:8px; }
+    .examples button { background:#0f1b36; border:1px solid #263860; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KMP — Build LPS (π) Visualizer</h1>
+    <span class="small">Step through how the prefix function is constructed.</span>
+  </header>
+
+  <!-- Python code viewer (compute_lps only) -->
+  <section class="codebox" id="pyBox">
+    <header>
+      <div class="seg">
+        <span class="title">Python Reference Implementation</span>
+        <span class="badge">compute_lps() — live highlighted</span>
+      </div>
+    </header>
+    <div class="code" id="pyCode"></div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div>
+        <label for="pattern">Pattern (needle)</label>
+        <input id="pattern" type="text" value="ABABCABAB" />
+      </div>
+      <div>
+        <label class="small">Quick Examples</label>
+        <div class="examples">
+          <button class="slim" onclick="loadExample('overlap')">ABABABA</button>
+          <button class="slim" onclick="loadExample('uniform')">AAAAAA</button>
+          <button class="slim" onclick="loadExample('zigzag')">AABAACAABAA</button>
+          <button class="slim" onclick="loadExample('edge1')">A</button>
+          <button class="slim" onclick="loadExample('edge2')">(empty)</button>
+        </div>
+      </div>
+    </div>
+    <div class="btns" style="margin-top: 10px;">
+      <button id="prev" class="ghost">◀ Prev</button>
+      <button id="step" class="primary">Step ▶</button>
+      <button id="auto" class="ghost">Auto Play</button>
+      <button id="reset" class="danger">Reset</button>
+      <label class="small" style="margin-left:auto">Speed
+        <input id="speed" type="range" min="150" max="1200" step="50" value="450" />
+      </label>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel board">
+      <div class="row">
+        <div class="label">Pattern</div>
+        <div id="patternRow" class="tape"></div>
+      </div>
+      <div class="row">
+        <div class="label">LPS / Prefix Function π</div>
+        <div id="lpsRow" class="tape lps"></div>
+      </div>
+      <div class="row">
+        <div class="label">Narration</div>
+        <div id="narration" class="bullet">Click <em>Step</em> or <em>Auto Play</em> to build π. Pointers <strong>i</strong> (scan) and <strong>len</strong> (current border) illustrate the process.</div>
+        <div id="hint" class="small"></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+
+    // ---------------- State ----------------
+    let pattern = '';
+    let lps = [];
+    let iPtr = 1;   // scanning index in pattern (named i to match Python)
+    let len = 0;    // current longest proper prefix-suffix length
+    let frames = []; // computed micro-steps
+    let idx = 0;     // current frame index
+    let autoTimer = null;
+    let historyStack = []; // for Prev
+
+    // ---------------- UI helpers ----------------
+    function makeCells(container, arr, type) {
+      container.innerHTML = '';
+      [...arr].forEach((ch, i) => {
+        const c = document.createElement('div');
+        c.className = `cell ${type}`;
+        c.dataset.index = i;
+        c.innerHTML = `<div>${type === 'lps' ? ch : (ch === ' ' ? '␠' : ch)}</div><div class="idx">${i}</div>`;
+        container.appendChild(c);
+      });
+    }
+    function clearCursorsOnly() {
+      document.querySelectorAll('.cursor').forEach(x => x.remove());
+      document.querySelectorAll('.cell.active').forEach(c => c.classList.remove('active'));
+    }
+    function clearCompareMarks() {
+      document.querySelectorAll('.cell.match, .cell.mismatch').forEach(c => c.classList.remove('match','mismatch'));
+    }
+    function paintPointers(i, l) {
+      clearCursorsOnly();
+      const iCell = document.querySelector(`#patternRow .cell[data-index="${i}"]`);
+      const lCell = document.querySelector(`#patternRow .cell[data-index="${l}"]`);
+      if (iCell) { iCell.classList.add('active'); const cur = document.createElement('div'); cur.className='cursor i'; cur.textContent='i'; iCell.appendChild(cur); }
+      if (lCell) { lCell.classList.add('active'); const cur2 = document.createElement('div'); cur2.className='cursor j'; cur2.textContent='len'; lCell.appendChild(cur2); }
+    }
+    function narr(s, hint='') { el('narration').innerHTML = s; el('hint').textContent = hint; }
+
+    // ---------------- Frame builder ----------------
+    function buildFrames(pat) {
+      const steps = []; const tmp = new Array(pat.length).fill(0);
+      let i = 1, L = 0; // local pointers matching Python
+      steps.push({action:'init', i, L});
+      while (i < pat.length) {
+        steps.push({action:'compare', i, L, a: pat[i], b: pat[L]});
+        if (pat[i] === pat[L]) {
+          L++; tmp[i] = L; steps.push({action:'match-set', i, L, val:L}); i++;
+        } else {
+          if (L !== 0) { const to = tmp[L-1]; steps.push({action:'fallback', i, from:L, to}); L = to; }
+          else { tmp[i] = 0; steps.push({action:'zero', i}); i++; }
+        }
+      }
+      steps.push({action:'done', lps: tmp});
+      return steps;
+    }
+
+    // ---------------- Step execution ----------------
+    function applyFrame(f) {
+      if (!f) return;
+      if (f.action === 'init') {
+        paintPointers(f.i, f.L);
+        narr('Initialized: i = 1, len = 0', 'Compare pattern[i] with pattern[len].');
+      } else if (f.action === 'compare') {
+        paintPointers(f.i, f.L);
+        clearCompareMarks();
+        const ic = document.querySelector(`#patternRow .cell[data-index="${f.i}"]`);
+        const lc = document.querySelector(`#patternRow .cell[data-index="${f.L}"]`);
+        const same = f.a === f.b;
+        if (ic) ic.classList.add(same ? 'match' : 'mismatch');
+        if (lc) lc.classList.add(same ? 'match' : 'mismatch');
+        narr(`Compare pattern[i=${f.i}] vs pattern[len=${f.L}]`, same ? 'They match → set lps[i] and advance both.' : 'They differ → either fallback len or set lps[i]=0.');
+        highlightFor('compare');
+      } else if (f.action === 'match-set') {
+        lps[f.i] = f.val; makeCells(el('lpsRow'), lps, 'lps');
+        const cell = document.querySelector(`#lpsRow .cell[data-index="${f.i}"]`); if (cell) cell.classList.add('match');
+        narr(`Set lps[${f.i}] = ${f.val}`, 'Advance i and len.');
+        highlightFor('match');
+      } else if (f.action === 'fallback') {
+        narr(`Fallback: len ← lps[len-1] (${f.from} → ${f.to})`, 'i stays, only len changes.');
+        paintPointers(f.i, f.to);
+        highlightFor('fallback');
+      } else if (f.action === 'zero') {
+        lps[f.i] = 0; makeCells(el('lpsRow'), lps, 'lps');
+        const z = document.querySelector(`#lpsRow .cell[data-index="${f.i}"]`); if (z) z.classList.add('mismatch');
+        narr(`No border → lps[${f.i}] = 0`, 'Advance i by 1.');
+        highlightFor('zero');
+      } else if (f.action === 'done') {
+        lps = f.lps.slice(); makeCells(el('lpsRow'), lps, 'lps');
+        narr('<strong>Done.</strong> π table completed.', 'Switch to your KMP search page to use it.');
+        highlightFor('done');
+      }
+    }
+
+    function step() {
+      if (!frames.length) return;
+      if (idx >= frames.length) { stopAuto(); return; }
+      recordState();
+      applyFrame(frames[idx++]);
+      const f = frames[idx-1];
+      if (f.action === 'match-set') { iPtr = f.i + 1; len = f.L; paintPointers(iPtr, len); }
+      else if (f.action === 'fallback') { len = f.to; const next = frames[idx]; paintPointers(next?.i ?? iPtr, len); }
+      else if (f.action === 'zero') { iPtr = f.i + 1; paintPointers(iPtr, len); }
+      else if (f.action === 'compare') { iPtr = f.i; len = f.L; }
+    }
+
+    function prev() {
+      if (historyStack.length < 2) return;
+      historyStack.pop();
+      const s = historyStack[historyStack.length - 1];
+      ({ pattern, lps, iPtr, len, idx, frames } = { ...s, lps: [...s.lps], frames: [...s.frames] });
+      el('pattern').value = pattern;
+      renderAll();
+      narr(`Reverted to previous step (i=${iPtr}, len=${len})`, 'Step ▶ to go forward again.');
+    }
+
+    function recordState() {
+      historyStack.push({ pattern, lps: [...lps], iPtr, len, idx, frames: [...frames] });
+    }
+
+    function reset() {
+      stopAuto();
+      pattern = el('pattern').value;
+      lps = new Array(pattern.length).fill(0);
+      iPtr = 1; len = 0; idx = 0;
+      frames = buildFrames(pattern);
+      historyStack = [];
+      renderAll();
+      recordState();
+      narr('Reset. Use Step ▶ or Auto Play.', 'Watch how len falls back without moving i.');
+    }
+
+    function renderAll() {
+      pattern = el('pattern').value;
+      makeCells(el('patternRow'), pattern, 'pattern');
+      makeCells(el('lpsRow'), lps, 'lps');
+      paintPointers(iPtr, len);
+    }
+
+    function autoPlay() {
+      if (autoTimer) { stopAuto(); return; }
+      el('auto').textContent = 'Auto Playing… (click to stop)';
+      const tick = () => {
+        step();
+        if (idx >= frames.length) { stopAuto(); return; }
+        autoTimer = setTimeout(tick, Number(el('speed').value));
+      };
+      tick();
+    }
+    function stopAuto() { if (autoTimer) clearTimeout(autoTimer); autoTimer = null; el('auto').textContent = 'Auto Play'; }
+
+    function loadExample(which) {
+      const map = {
+        overlap: 'ABABABA',
+        uniform: 'AAAAAA',
+        zigzag:  'AABAACAABAA',
+        edge1:   'A',
+        edge2:   ''
+      };
+      el('pattern').value = map[which] ?? 'ABABCABAB';
+      reset();
+    }
+
+    // ---------------- Python code rendering & highlighting ----------------
+    const PY_SRC = [
+      "def compute_lps(p):",
+      "    lps = [0] * len(p)",
+      "    length = 0",
+      "    i = 1",
+      "    while i < len(p):",
+      "        if p[i] == p[length]:",
+      "            length += 1",
+      "            lps[i] = length",
+      "            i += 1",
+      "        else:",
+      "            if length != 0:",
+      "                length = lps[length - 1]",
+      "            else:",
+      "                lps[i] = 0",
+      "                i += 1",
+      "    return lps",
+    ];
+
+    let codeElems = [];
+    function renderCode() {
+      const box = el('pyCode');
+      box.innerHTML = '';
+      codeElems = PY_SRC.map((line, idx) => {
+        const row = document.createElement('div');
+        row.className = 'code-line';
+        row.dataset.line = idx + 1;
+        const gut = document.createElement('div'); gut.className = 'gutter'; gut.textContent = String(idx+1).padStart(2,' ');
+        const src = document.createElement('div'); src.className = 'src'; src.textContent = line;
+        row.appendChild(gut); row.appendChild(src); box.appendChild(row);
+        return row;
+      });
+    }
+    function clearCodeActive(){ codeElems.forEach(r => r.classList.remove('active')); }
+    function highlightLines(lines){
+      clearCodeActive();
+      const arr = Array.isArray(lines) ? lines : [lines];
+      arr.forEach(n => { const r = codeElems[n-1]; if (r) r.classList.add('active'); });
+      const first = codeElems[(Array.isArray(lines)?lines[0]:lines)-1];
+      if (first) first.scrollIntoView({ block: 'nearest' });
+    }
+    function highlightFor(action) {
+      if (action === 'compare') highlightLines([5,6]);
+      else if (action === 'match') highlightLines([7,8,9]);
+      else if (action === 'fallback') highlightLines([11,12]);
+      else if (action === 'zero') highlightLines([13,14,15]);
+      else clearCodeActive();
+    }
+
+    // ---------------- Wire & Boot ----------------
+    function wire() {
+      el('step').addEventListener('click', step);
+      el('prev').addEventListener('click', prev);
+      el('auto').addEventListener('click', autoPlay);
+      el('reset').addEventListener('click', reset);
+      el('pattern').addEventListener('input', reset);
+    }
+    function boot() {
+      renderCode();
+      lps = [];
+      reset();
+    }
+    wire();
+    boot();
+  </script>
+</body>
+</html>

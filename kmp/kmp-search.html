@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KMP String Matching Visualizer</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111831;
+      --ink: #e9eefc;
+      --muted: #94a3b8;
+      --accent: #7c3aed;
+      --accent-2: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --good: #22c55e;
+      --card: #0f172a;
+      --chip: #1f2a44;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink); background: linear-gradient(180deg, #0b1020 0%, #0b1226 100%);
+      display: grid; grid-template-rows: auto 1fr; gap: 12px; padding: 18px;
+    }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.3px; }
+    .panel { background: var(--panel); border: 1px solid #1f2a44; border-radius: 14px; padding: 14px; }
+    .grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 14px; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { font-size: 12px; color: var(--muted); }
+    input[type="text"] { width: 100%; padding: 10px 12px; background: var(--card); color: var(--ink);
+      border: 1px solid #223056; border-radius: 10px; font-size: 14px; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button { border: 0; border-radius: 10px; padding: 10px 12px; color: white; cursor: pointer; font-weight: 600; }
+    .primary { background: var(--accent); }
+    .ghost { background: #1e293b; }
+    .danger { background: var(--bad); }
+    .slim { padding: 8px 10px; font-size: 12px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .board { display: grid; gap: 14px; }
+
+    .row { display: grid; gap: 6px; }
+    .row .label { font-size: 12px; color: var(--muted); }
+    .tape { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: var(--card); border: 1px solid #1f2a44; border-radius: 12px; }
+    .cell { position: relative; min-width: 28px; height: 36px; display: grid; place-items: center; padding: 0 6px;
+      background: var(--chip); border: 1px solid #263860; border-radius: 8px; font-weight: 700; }
+    .cell .idx { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); }
+    .cell.active { outline: 2px solid var(--accent); }
+    .cell.match { background: #073d2b; border-color: #147a52; }
+    .cell.mismatch { background: #3a0e14; border-color: #7a1423; }
+    .cell.pattern { background: #2b1f55; border-color: #5b3ebf; }
+    .cell.text { background: #1b2d4d; border-color: #345caa; }
+    .cursor { position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; padding: 2px 6px; border-radius: 6px; background: var(--accent);
+    }
+    .cursor.j { background: var(--warn); }
+
+    .lps { display: flex; gap: 6px; flex-wrap: wrap; }
+    .lps .cell { background: #17223d; }
+
+    .codebox { background: #0a1428; border: 1px solid #1f2a44; border-radius: 14px; padding: 0; overflow: hidden; height: 650px; }
+    .codebox header { display:flex; justify-content: space-between; align-items:center; padding:10px 12px; border-bottom: 1px solid #1f2a44; background:#0f1b36; }
+    .codebox header .title { font-size: 12px; color: var(--muted); }
+    .codebox .code { height: 610px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 1.45; }
+    .code-line { display: grid; grid-template-columns: 48px 1fr; gap: 8px; padding: 6px 12px; }
+    .code-line:nth-child(odd) { background: #0b1a33; }
+    .gutter { color:#5b6b8c; text-align: right; padding-right: 6px; }
+    .src { color:#dbe7ff; white-space: pre; }
+    .code-line.active { background: #1b2650 !important; box-shadow: inset 0 0 0 1px #33457a; }
+    .badge { background:#1e293b; color:#9fb4d9; border:1px solid #2b3b65; border-radius: 8px; padding:4px 8px; font-size:11px; }
+    .seg { display:flex; gap:6px; align-items:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Knuth–Morris–Pratt (KMP) — Visual Guide</h1>
+    <span class="small">Step through the algorithm to see why it runs in <strong>O(n)</strong>.</span>
+  </header>
+
+  <section class="codebox" id="pyBox">
+    <header>
+      <div class="seg">
+        <span class="title">Python Reference Implementation</span>
+        <span class="badge">kmp_search() — live highlighted</span>
+      </div>
+    </header>
+    <div class="code" id="pyCode"></div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <div>
+        <label for="text">Text (haystack)</label>
+        <input id="text" type="text" value="ABABDABACDABABCABAB" />
+      </div>
+      <div>
+        <label for="pattern">Pattern (needle)</label>
+        <input id="pattern" type="text" value="ABABCABAB" />
+      </div>
+    </div>
+    <div class="btns" style="margin-top: 10px;">
+      <button id="buildLps" class="ghost">Build LPS (π) Table</button>
+      <button id="prev" class="ghost">◀ Prev</button>
+      <button id="step" class="primary">Step ▶</button>
+      <button id="auto" class="ghost">Auto Play</button>
+      <button id="reset" class="danger">Reset</button>
+      <label class="small" style="margin-left:auto">Speed
+        <input id="speed" type="range" min="150" max="1200" step="50" value="450" />
+      </label>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel board">
+      <div class="row">
+        <div class="label">Text</div>
+        <div id="textRow" class="tape"></div>
+      </div>
+      <div class="row">
+        <div class="label">Pattern</div>
+        <div id="patternRow" class="tape"></div>
+      </div>
+      <div class="row">
+        <div class="label">LPS / Prefix Function π (for pattern)</div>
+        <div id="lpsRow" class="tape lps"></div>
+      </div>
+      <div class="row">
+        <div class="label">Narration</div>
+        <div id="narration" class="bullet">Click <em>Build LPS</em> to compute the prefix table, then use <em>Step</em> or <em>Auto Play</em> to run KMP.</div>
+        <div id="hint" class="hint"></div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+
+    // -------------- State --------------
+    let text = '';
+    let pattern = '';
+    let lps = [];
+    let i = 0, j = 0, comparisons = 0, found = 0;
+    let autoTimer = null;
+    let historyStack = [];
+
+    // -------------- UI helpers --------------
+    function makeCells(container, arr, type) {
+      container.innerHTML = '';
+      [...arr].forEach((ch, idx) => {
+        const c = document.createElement('div');
+        c.className = `cell ${type}`;
+        c.dataset.index = idx;
+        c.innerHTML = `<div>${type === 'lps' ? ch : (ch === ' ' ? '␠' : ch)}</div><div class="idx">${idx}</div>`;
+        container.appendChild(c);
+      });
+    }
+
+    function renderAll() {
+      text = el('text').value;
+      pattern = el('pattern').value;
+      makeCells(el('textRow'), text, 'text');
+      makeCells(el('patternRow'), pattern, 'pattern');
+      if (!lps.length) el('lpsRow').innerHTML = '';
+      updateCounters();
+      paintCursors();
+    }
+
+    function updateCounters() {
+      el('nVal')?.textContent !== undefined ? null : null; // counters may be absent in this trimmed layout
+    }
+
+    function clearCursorsOnly() {
+      document.querySelectorAll('.cursor').forEach(x => x.remove());
+      document.querySelectorAll('.cell.active').forEach(c => c.classList.remove('active'));
+    }
+    function clearCompareMarks() {
+      document.querySelectorAll('.cell.match, .cell.mismatch').forEach(c => c.classList.remove('match','mismatch'));
+    }
+
+    function paintCursors() {
+      clearCursorsOnly();
+      const textCell = document.querySelector(`#textRow .cell[data-index="${i}"]`);
+      const pattCell = document.querySelector(`#patternRow .cell[data-index="${j}"]`);
+      if (textCell) {
+        textCell.classList.add('active');
+        const cur = document.createElement('div'); cur.className = 'cursor i'; cur.textContent = 'i';
+        textCell.appendChild(cur);
+      }
+      if (pattCell) {
+        pattCell.classList.add('active');
+        const cur = document.createElement('div'); cur.className = 'cursor j'; cur.textContent = 'j';
+        pattCell.appendChild(cur);
+      }
+    }
+
+    function narr(s, hint='') {
+      const n = el('narration'); if (n) n.innerHTML = s;
+      const h = el('hint'); if (h) h.textContent = hint;
+    }
+
+    // -------------- Algorithm pieces --------------
+    function buildLps() {
+      lps = new Array(pattern.length).fill(0);
+      let len = 0; // previous longest prefix suffix
+      let p = 1;
+      while (p < pattern.length) {
+        if (pattern[p] === pattern[len]) { len++; lps[p] = len; p++; }
+        else { if (len !== 0) { len = lps[len-1]; } else { lps[p] = 0; p++; } }
+      }
+      makeCells(el('lpsRow'), lps, 'lps');
+      narr(`<strong>LPS built.</strong> π[j] = longest proper prefix of pattern[0..j] that is also a suffix.`, 'This table drives the j fallbacks.');
+    }
+
+    function highlightCompare(ok) {
+      const t = document.querySelector(`#textRow .cell[data-index="${i}"]`);
+      const p = document.querySelector(`#patternRow .cell[data-index="${j}"]`);
+      if (t) t.classList.add(ok ? 'match' : 'mismatch');
+      if (p) p.classList.add(ok ? 'match' : 'mismatch');
+    }
+
+    function doKmpStep() {
+      if (!pattern.length) { narr('Empty pattern trivially matches at index 0.'); return; }
+      if (!lps.length) buildLps();
+      if (i >= text.length) { narr('Reached end of text. Done.'); stopAuto(); return; }
+
+      comparisons++;
+      clearCompareMarks();
+
+      const same = text[i] === pattern[j];
+      highlightCompare(same);
+
+      if (same) {
+        narr(`Match at (i=${i}, j=${j}). Advance both.`, 'On match, we consume one text char.');
+        i++; j++;
+        if (j === pattern.length) {
+          found++;
+          const pos = i - j;
+          narr(`<span class="found">Found a match ending at i=${i-1}. Starting index = ${pos}.</span> Now set j = lps[j-1] to search for the next match.`, 'This allows overlapping matches.');
+          j = lps[j-1];
+        }
+      } else {
+        if (j !== 0) {
+          const prev = j;
+          j = lps[j-1];
+          narr(`Mismatch at (i=${i}, j=${prev}). <strong>i stays</strong>, fallback j → lps[${prev-1}] = ${j}.`, 'i does NOT move back — that’s why KMP is linear.');
+        } else {
+          narr(`Mismatch at (i=${i}, j=0). Advance i → ${i+1}.`, 'When j = 0, we simply skip a text character.');
+          i++;
+        }
+      }
+      paintCursors();
+    }
+
+    // History for Prev
+    function recordState() {
+      historyStack.push({ i, j, comparisons, found, lps: [...lps], text, pattern });
+    }
+    function restoreState() {
+      if (historyStack.length < 2) return; // at least one past state
+      historyStack.pop(); // remove current
+      const prevState = historyStack[historyStack.length - 1];
+      if (!prevState) return;
+      ({ i, j, comparisons, found, lps, text, pattern } = { ...prevState, lps: [...prevState.lps] });
+      el('text').value = text; el('pattern').value = pattern;
+      makeCells(el('lpsRow'), lps, 'lps');
+      renderAll();
+      narr(`Reverted to previous step (i=${i}, j=${j})`, 'Use Step ▶ to go forward again.');
+    }
+
+    // ---------- Python code rendering & highlighting (kmp_search only) ----------
+    const PY_SRC = [
+      "def kmp_search(t, p):",
+      "    n, m = len(t), len(p)",
+      "    if m == 0:",
+      "        return [0]",
+      "    lps = compute_lps(p)",
+      "    res = []",
+      "    i = j = 0",
+      "    while i < n:",
+      "        if t[i] == p[j]:",
+      "            i += 1; j += 1",
+      "            if j == m:",
+      "                res.append(i - j)",
+      "                j = lps[j - 1]",
+      "        else:",
+      "            if j != 0:",
+      "                j = lps[j - 1]",
+      "            else:",
+      "                i += 1",
+      "    return res",
+    ];
+
+    let codeElems = [];
+    function renderCode() {
+      const box = el('pyCode');
+      box.innerHTML = '';
+      codeElems = PY_SRC.map((line, idx) => {
+        const row = document.createElement('div');
+        row.className = 'code-line';
+        row.dataset.line = idx + 1;
+        const gut = document.createElement('div'); gut.className = 'gutter'; gut.textContent = String(idx+1).padStart(2,' ');
+        const src = document.createElement('div'); src.className = 'src'; src.textContent = line;
+        row.appendChild(gut); row.appendChild(src); box.appendChild(row);
+        return row;
+      });
+    }
+    function clearCodeActive(){ codeElems.forEach(r => r.classList.remove('active')); }
+    function highlightLines(lines){
+      clearCodeActive();
+      const arr = Array.isArray(lines) ? lines : [lines];
+      arr.forEach(n => { const r = codeElems[n-1]; if (r) r.classList.add('active'); });
+      const first = codeElems[(Array.isArray(lines)?lines[0]:lines)-1];
+      if (first) first.scrollIntoView({ block: 'nearest' });
+    }
+
+    function hlForCompare(match) { highlightLines(match ? [9,10] : [14]); }
+    function hlForFound() { highlightLines([11,12,13]); }
+    function hlForFallbackJ() { highlightLines([15,16]); }
+    function hlForAdvanceI() { highlightLines([17]); }
+
+    // Wrapper to combine history + code highlighting
+    function stepKmp() {
+      highlightLines([9]);
+      const prevI = i, prevJ = j, prevFound = found;
+      recordState();
+      doKmpStep();
+      if (found > prevFound) { hlForFound(); return; }
+      if (i > prevI && j > prevJ) { hlForCompare(true); }
+      else if (i === prevI && j < prevJ) { hlForFallbackJ(); }
+      else if (i > prevI && j === prevJ) { hlForAdvanceI(); }
+    }
+
+    function reset(all=false) {
+      stopAuto();
+      i = 0; j = 0; comparisons = 0; found = 0;
+      if (all) lps = [];
+      renderAll();
+      historyStack = [];
+      recordState();
+      narr('Reset. Click <em>Build LPS</em> and then <em>Step</em> to start.', 'Try patterns with self-overlap to see bigger jumps.');
+    }
+
+    function autoPlay() {
+      if (autoTimer) { stopAuto(); return; }
+      el('auto').textContent = 'Auto Playing… (click to stop)';
+      const tick = () => {
+        stepKmp();
+        if (i >= text.length) { stopAuto(); return; }
+        autoTimer = setTimeout(tick, Number(el('speed').value));
+      };
+      tick();
+    }
+
+    function stopAuto() {
+      if (autoTimer) clearTimeout(autoTimer);
+      autoTimer = null;
+      el('auto').textContent = 'Auto Play';
+    }
+
+    // Quick examples / test cases (optional UI not shown, but can be wired to buttons if added)
+    function loadExample(name) {
+      const cases = {
+        classic: { t: 'ABABDABACDABABCABAB', p: 'ABABCABAB' },
+        overlap: { t: 'ABABABA', p: 'ABABA' },
+        uniform: { t: 'AAAAAAAAAAAA', p: 'AAAA' },
+        nomatch: { t: 'ABCDEF', p: 'GHI' },
+        emptyP: { t: 'ABC', p: '' },
+        real:   { t: 'abcxabcdabxabcdabcdabcy', p: 'abcdabcy' },
+      };
+      const ex = cases[name];
+      if (!ex) return;
+      el('text').value = ex.t; el('pattern').value = ex.p;
+      reset(true);
+    }
+
+    // -------------- Wire up --------------
+    function wire() {
+      el('buildLps').addEventListener('click', () => { lps = []; buildLps(); paintCursors(); });
+      el('step').addEventListener('click', stepKmp);
+      el('prev').addEventListener('click', restoreState);
+      el('auto').addEventListener('click', autoPlay);
+      el('reset').addEventListener('click', () => reset(true));
+      el('text').addEventListener('input', () => reset(true));
+      el('pattern').addEventListener('input', () => reset(true));
+    }
+
+    // -------------- Boot --------------
+    function boot() {
+      renderCode();
+      renderAll();
+      historyStack = [];
+      recordState();
+      narr('Ready. Build the LPS table first, then step through the search.', 'Notice how i never moves backward.');
+    }
+
+    wire();
+    boot();
+  </script>
+</body>
+</html>

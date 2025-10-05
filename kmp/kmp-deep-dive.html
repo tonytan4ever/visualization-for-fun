@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KMP String Match Deep Dive — Why the runtime is O(m + n)</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111831;
+      --ink: #e9eefc;
+      --muted: #94a3b8;
+      --accent: #7c3aed;
+      --accent-2: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --good: #22c55e;
+      --card: #0f172a;
+      --chip: #1f2a44;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink); background: linear-gradient(180deg, #0b1020 0%, #0b1226 100%);
+      display: grid; grid-template-rows: auto auto 1fr auto; gap: 12px; padding: 18px;
+    }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.3px; }
+    .small { font-size: 12px; color: var(--muted); }
+
+    .panel { background: var(--panel); border: 1px solid #1f2a44; border-radius: 14px; padding: 14px; }
+    .bullet { background: #0f172a; padding: 12px; border-radius: 10px; border: 1px dashed #2b3b65; margin-top: 8px; }
+
+    .links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card { background: #0f172a; border: 1px solid #1f2a44; border-radius: 12px; padding: 12px; }
+    .card h4 { margin: 0 0 6px; font-size: 14px; display:flex; align-items:center; gap:6px; }
+    .card a { color: #c7d2fe; text-decoration: none; font-weight: 700; border-radius: 8px; padding: 2px 6px; }
+    .card a:hover { text-decoration: underline; }
+    .badge { display:inline-block; background:#1e293b; color:#9fb4d9; border:1px solid #2b3b65; border-radius: 8px; padding:4px 8px; font-size:11px; margin-left:6px; }
+
+    table { width:100%; border-collapse: collapse; margin-top:10px; font-size:14px; }
+    th, td { padding:6px; border:1px solid #334155; }
+    thead tr { background:#1e293b; color:#cbd5e1; }
+    tfoot tr { background:#1e293b; color:#cbd5e1; }
+
+    footer { text-align:center; color: var(--muted); font-size: 12px; padding-top: 6px; }
+    @media (max-width: 980px) { .links { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>KMP String Match Deep Dive — Why the runtime is O(m + n)</h1>
+      <div class="small">Amortized view: <strong>i</strong> never moves backward; fallbacks only move <strong>j</strong> via LPS.</div>
+    </div>
+    <nav class="small">
+      <a id="link-search" href="kmp-search.html">KMP Search</a>
+      &nbsp;•&nbsp;
+      <a id="link-lps" href="compute-lps.html">Compute LPS (π)</a>
+    </nav>
+  </header>
+
+  <!-- Cross-links / context cards -->
+  <section class="panel">
+    <div class="links">
+      <div class="card">
+        <h4>Reference: <a id="card-search" href="kmp-search.html">KMP Search Visualizer</a></h4>
+        <div class="small">Step through text vs pattern matching with <strong>i</strong> and <strong>j</strong>.</div>
+      </div>
+      <div class="card">
+        <h4>Reference: <a id="card-lps" href="compute-lps.html">Compute LPS (π) Visualizer</a> <span class="badge">KMP-on-pattern</span></h4>
+        <div class="small">Insight: <em>compute_lps</em> is the same mechanism as KMP search, but the text equals the pattern.</div>
+      </div>
+      <div class="card">
+        <h4>Key takeaway</h4>
+        <div class="small">Total work ≤ text advances + pattern fallbacks ≤ <strong>n + m</strong>.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Theory-only content -->
+  <section class="panel">
+    <h2>The Theory Behind KMP’s O(m + n) Time Complexity</h2>
+    <div class="bullet">
+      <p>The Knuth–Morris–Pratt (KMP) algorithm achieves <strong>linear time</strong> string matching by eliminating redundant comparisons. After a mismatch, it uses the <strong>Longest Prefix Suffix (LPS)</strong> array to skip ahead instead of re-checking characters that are known to match.</p>
+    </div>
+
+    <h3>1) Two Phases</h3>
+    <div class="bullet">
+      <ul>
+        <li><strong>Preprocessing (O(m))</strong>: Build the LPS/π array for the pattern <code>p</code>. LPS[j] = length of the longest proper prefix of <code>p[0..j]</code> that is also a suffix.</li>
+        <li><strong>Search (O(n))</strong>: Scan the text once. On mismatch with <code>j &gt; 0</code>, set <code>j = LPS[j-1]</code> (i doesn’t change); with <code>j = 0</code>, advance <code>i</code>.</li>
+      </ul>
+      <p>Combined cost: <strong>O(m + n)</strong>.</p>
+    </div>
+
+    <h3>1.1) Understanding the Preprocessing Step</h3>
+    <div class="bullet">
+      <p>The preprocessing step computes the <strong>LPS (Longest Proper Prefix-Suffix)</strong> array, which encodes the structure of the pattern itself. For each position <code>j</code>, LPS[j] tells us how many characters can be skipped if a mismatch happens after position <code>j</code>.</p>
+      <p><strong>Example:</strong> Suppose the pattern is <code>ABABC</code>. Here’s how the LPS array is derived:</p>
+      <ul>
+        <li><code>p[0] = 'A'</code> → no proper prefix/suffix → LPS[0] = 0</li>
+        <li><code>p[1] = 'B'</code> → prefixes/suffixes don’t match → LPS[1] = 0</li>
+        <li><code>p[2] = 'A'</code> → prefix <code>A</code> matches suffix <code>A</code> → LPS[2] = 1</li>
+        <li><code>p[3] = 'B'</code> → prefix <code>AB</code> matches suffix <code>AB</code> → LPS[3] = 2</li>
+        <li><code>p[4] = 'C'</code> → mismatch, fallback to LPS[3-1] = LPS[1] = 0 → LPS[4] = 0</li>
+      </ul>
+      <p>So, <strong>LPS = [0, 0, 1, 2, 0]</strong>. It means if a mismatch happens after matching up to <code>p[3]</code>, we can skip directly to <code>p[LPS[3]]</code> = <code>p[2]</code> without re-checking the previous characters.</p>
+    </div>
+
+    <h3>2) Why Not O(m·n)?</h3>
+    <div class="bullet">
+      <p>Naïve search may revisit the same text positions many times. KMP never moves <code>i</code> backward and only moves <code>j</code> backward along precomputed borders. Each character of the text is processed at most once; each character of the pattern participates in at most one decreasing sequence of fallbacks.</p>
+    </div>
+
+    <h3>3) Amortized Proof Sketch</h3>
+    <div class="bullet">
+      <p>Define a potential function Φ = i + j. Each iteration changes Φ by at most 1 and Φ is bounded by n + m. Therefore, the total number of iterations is O(n + m). Intuitively: matches consume text; mismatches recycle partial knowledge via LPS without re-reading text.</p>
+    </div>
+
+    <h3>4) Invariant</h3>
+    <div class="bullet">
+      <p>Before each comparison, <code>p[0..j-1]</code> equals the suffix of <code>t[0..i-1]</code>. After a mismatch, setting <code>j = LPS[j-1]</code> preserves this invariant and avoids redundant work.</p>
+    </div>
+
+    <h3>5) Relationship of <code>compute_lps()</code> to <code>kmp_search()</code></h3>
+    <div class="bullet">
+      <p><strong>compute_lps</strong> is a <strong>special case of KMP</strong>: it runs the same idea with the pattern as both text and pattern. That’s why its complexity is O(m) and why it seamlessly powers the O(n) search phase.</p>
+      <p class="small">Jump to: <a href="compute-lps.html" id="jump-lps">Compute LPS</a> · <a href="kmp-search.html" id="jump-search">KMP Search</a></p>
+    </div>
+
+    <h3>6) Summary</h3>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Operation</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Preprocessing</td><td>Compute LPS array</td><td>O(m)</td></tr>
+        <tr><td>Search</td><td>Scan text once using LPS</td><td>O(n)</td></tr>
+      </tbody>
+      <tfoot>
+        <tr><td><strong>Total</strong></td><td><strong>No redundant rescans</strong></td><td><strong>O(m + n)</strong></td></tr>
+      </tfoot>
+    </table>
+  </section>
+
+  <footer>
+    <span>Tip: Try patterns with heavy self-overlap (e.g., <code>AAAA…</code>, <code>ABAB…</code>) in your visualizers to see why LPS is crucial.</span>
+  </footer>
+
+  <script>
+    // Subtle highlight around the two function links to emphasize their relationship
+    (function spotlight(){
+      const ids = ['link-search','link-lps','card-search','card-lps','jump-search','jump-lps'];
+      ids.map(id => document.getElementById(id)).filter(Boolean).forEach(a => {
+        a.style.boxShadow = '0 0 0 2px #7c3aed inset, 0 0 0 4px rgba(124,58,237,0.25)';
+      });
+    })();
+  </script>
+</body>
+</html>
