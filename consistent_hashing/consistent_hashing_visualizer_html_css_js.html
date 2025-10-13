@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consistent Hashing Visualizer</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a33;
+      --panel-2: #0f1730;
+      --text: #e9eefb;
+      --muted: #a7b3d1;
+      --accent: #7aa2f7;
+      --success: #5ee1a6;
+      --warn: #ffd166;
+      --danger: #ff6b6b;
+      --line: #263257;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 70% 20%, #10183a 0%, var(--bg) 55%);
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(6px);
+      position: sticky; top: 0; z-index: 5; background: rgba(11,16,32,.6);
+    }
+    header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+    header .sub { color: var(--muted); font-size: 12px; }
+
+    .wrap { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .panel h2 { font-size: 14px; font-weight: 700; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+
+    .controls { display: grid; gap: 14px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: #0c1430; color: var(--text);
+    }
+    input[type="range"]{ width: 100%; }
+    .btn {
+      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: #0f1734; color: var(--text); cursor: pointer; font-weight: 600; letter-spacing: .2px;
+    }
+    .btn:hover{ filter: brightness(1.1); }
+    .btn.primary { background: linear-gradient(90deg, #4f6ef8, #7aa2f7); border-color: transparent; }
+    .btn.danger { background: linear-gradient(90deg, #f65a5a, #ff8585); border-color: transparent; }
+    .btn.ghost { background: transparent; border-color: var(--line); }
+
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 10px; }
+    .stat {
+      background: #0b1330; border: 1px dashed #263257; border-radius: 12px; padding: 10px; text-align: center;
+    }
+    .stat .v { font-size: 18px; font-weight: 800; }
+    .stat .k { font-size: 11px; color: var(--muted); }
+
+    #viz {
+      width: 100%; height: calc(100vh - 140px);
+      display: grid; place-items: center; position: sticky; top: 84px;
+      border-radius: 16px; border: 1px solid var(--line);
+      background: radial-gradient(600px 400px at 50% 20%, #111a3a 0%, #0b1020 70%);
+      overflow: hidden;
+    }
+    svg { width: 100%; height: 100%; }
+
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    .badge { font-size: 11px; border-radius: 999px; padding: 6px 10px; background: #0a1230; border: 1px solid var(--line); color: var(--muted); }
+
+    details { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #0b1330; }
+    summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; color: #a6b2d9; }
+
+    .server-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:#0a1230; font-size:12px; margin:2px 4px 0 0; }
+    .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+    .note { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Consistent Hashing Visualizer</h1>
+      <div class="sub">A mental model: place servers & keys on a ring; assign clockwise. Add/remove servers and see minimal key movement. Toggle replicas and failures.</div>
+    </div>
+    <div class="legend">
+      <span class="badge">Ring = keyspace</span>
+      <span class="badge">Solid line = primary assignment</span>
+      <span class="badge">Dashed = replicas</span>
+      <span class="badge">Red label = server down</span>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- Controls -->
+    <section class="panel">
+      <h2>Setup & Controls</h2>
+      <div class="controls">
+        <div>
+          <label>Replication factor</label>
+          <div class="row">
+            <input id="replicas" type="range" min="1" max="5" value="3" />
+            <span id="replicasLabel">3</span>
+          </div>
+        </div>
+
+        <div>
+          <label>Add server</label>
+          <div class="row2">
+            <input id="serverId" type="text" placeholder="e.g., A" />
+            <input id="serverPos" type="number" min="0" max="359" placeholder="° (0-359)" />
+          </div>
+          <div class="row" style="margin-top:8px; grid-template-columns: 1fr 1fr;">
+            <button class="btn" id="addServerRandom">Add Random</button>
+            <button class="btn primary" id="addServer">Add @°</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Remove / Toggle server</label>
+          <div class="row2">
+            <select id="serverSelect"></select>
+            <button class="btn danger" id="removeServer">Remove</button>
+          </div>
+          <div class="row" style="margin-top:8px; grid-template-columns: 1fr 1fr;">
+            <button class="btn ghost" id="toggleServer">Toggle Up/Down</button>
+            <button class="btn" id="shuffleServers">Shuffle positions</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Add keys</label>
+          <div class="row2">
+            <input id="keyName" type="text" placeholder="e.g., user_12345_cart" />
+            <button class="btn primary" id="addKey">Hash & Add</button>
+          </div>
+          <div class="row" style="margin-top:8px; grid-template-columns: 1fr 1fr;">
+            <button class="btn" id="addSampleKeys">Add 20 random keys</button>
+            <button class="btn danger" id="clearKeys">Clear keys</button>
+          </div>
+        </div>
+
+        <div>
+          <label>Show</label>
+          <div class="row" style="grid-template-columns: 1fr 1fr;">
+            <label><input type="checkbox" id="showReplicas" checked /> Replicas</label>
+            <label><input type="checkbox" id="showKeyLabels" /> Key labels</label>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="v" id="statServers">0</div><div class="k">Servers</div></div>
+          <div class="stat"><div class="v" id="statKeys">0</div><div class="k">Keys</div></div>
+          <div class="stat"><div class="v" id="statMoved">0</div><div class="k">Keys moved (last change)</div></div>
+        </div>
+
+        <details style="margin-top:12px;">
+          <summary>What is consistent hashing?</summary>
+          <div class="code" style="margin-top:8px;">
+            • Place servers and keys on a circular keyspace (0–359° in this demo).<br/>
+            • A key is assigned to the first server clockwise from its position (primary).<br/>
+            • Replication: also place copies on the next R−1 servers clockwise.<br/>
+            • When a server is added, only keys in its clockwise interval move to it.<br/>
+            • When a server fails, keys failover to their next replica holders.
+          </div>
+        </details>
+
+        <div style="margin-top:10px" id="serverChips"></div>
+        <div class="note" style="margin-top:10px">Tip: add a server, then watch how few keys move. Toggle a server down to simulate a crash and see replicas pick up the load.</div>
+      </div>
+    </section>
+
+    <!-- Visualization -->
+    <section id="viz" class="panel">
+      <svg id="svg"></svg>
+    </section>
+  </div>
+
+  <script>
+    // --- Utility functions ---
+    const TWO_PI = Math.PI * 2;
+    function degToRad(d){ return d * Math.PI/180; }
+    function radToDeg(r){ return r * 180/Math.PI; }
+    function polar(cx, cy, r, deg){ const a = degToRad(deg); return { x: cx + r*Math.cos(a), y: cy + r*Math.sin(a) }; }
+    function hashToDeg(str){
+      // Deterministic but simple string hash -> [0,359]
+      let h = 2166136261 >>> 0; // FNV-1a seed
+      for (let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+      return h % 360;
+    }
+
+    // --- State ---
+    let servers = []; // {id, pos, up:true}
+    let keys = [];    // {name, pos}
+    let replication = 3;
+    let lastAssignments = new Map(); // key -> primary server id (before change) to measure movement
+
+    // --- DOM ---
+    const svg = document.getElementById('svg');
+    const replicasRange = document.getElementById('replicas');
+    const replicasLabel = document.getElementById('replicasLabel');
+    const serverIdInput = document.getElementById('serverId');
+    const serverPosInput = document.getElementById('serverPos');
+    const addServerBtn = document.getElementById('addServer');
+    const addServerRandomBtn = document.getElementById('addServerRandom');
+    const removeServerBtn = document.getElementById('removeServer');
+    const toggleServerBtn = document.getElementById('toggleServer');
+    const shuffleServersBtn = document.getElementById('shuffleServers');
+    const serverSelect = document.getElementById('serverSelect');
+    const keyNameInput = document.getElementById('keyName');
+    const addKeyBtn = document.getElementById('addKey');
+    const addSampleKeysBtn = document.getElementById('addSampleKeys');
+    const clearKeysBtn = document.getElementById('clearKeys');
+    const showReplicasChk = document.getElementById('showReplicas');
+    const showKeyLabelsChk = document.getElementById('showKeyLabels');
+
+    const statServers = document.getElementById('statServers');
+    const statKeys = document.getElementById('statKeys');
+    const statMoved = document.getElementById('statMoved');
+    const serverChips = document.getElementById('serverChips');
+
+    // --- Assignment helpers ---
+    function sortedUpServers(){
+      return servers.filter(s=>s.up).sort((a,b)=>a.pos-b.pos);
+    }
+    function sortedAllServers(){
+      return [...servers].sort((a,b)=>a.pos-b.pos);
+    }
+    function clockwiseNext(array, startIndex, count){
+      const res = [];
+      for (let i=0;i<count;i++) res.push(array[(startIndex+i)%array.length]);
+      return res;
+    }
+    function findSuccessorServer(pos, list){
+      // first server clockwise from position pos
+      if (list.length===0) return null;
+      let idx = list.findIndex(s=>s.pos>=pos);
+      if (idx===-1) idx = 0;
+      return { server: list[idx], index: idx };
+    }
+
+    function assignKey(name, pos){
+      const up = sortedUpServers();
+      if (up.length===0) return { primary: null, replicas: [] };
+      const {server, index} = findSuccessorServer(pos, up);
+      const count = Math.min(replication, up.length);
+      const reps = clockwiseNext(up, index, count);
+      return { primary: server, replicas: reps };
+    }
+
+    // --- Rendering ---
+    function clearSVG(){ while (svg.firstChild) svg.removeChild(svg.firstChild); }
+
+    function draw(){
+      clearSVG();
+      const w = svg.clientWidth || svg.parentElement.clientWidth;
+      const h = svg.clientHeight || 600;
+      const cx = w/2; const cy = h/2; const R = Math.min(w, h)/2 - 40;
+
+      // ring
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
+      ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#2a3766'); ring.setAttribute('stroke-width', '2');
+      svg.appendChild(ring);
+
+      // ticks
+      for (let d=0; d<360; d+=30){
+        const p1 = polar(cx, cy, R-6, d-90);
+        const p2 = polar(cx, cy, R+6, d-90);
+        const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tick.setAttribute('x1', p1.x); tick.setAttribute('y1', p1.y); tick.setAttribute('x2', p2.x); tick.setAttribute('y2', p2.y);
+        tick.setAttribute('stroke', '#263257'); tick.setAttribute('stroke-width', d%90===0?2:1);
+        svg.appendChild(tick);
+      }
+
+      // draw assignments first (lines), then nodes on top
+      const showRep = showReplicasChk.checked;
+      const showKeyLabels = showKeyLabelsChk.checked;
+
+      // lines: for each key -> primary (solid)
+      for (const k of keys){
+        const a = assignKey(k.name, k.pos);
+        if (!a.primary) continue;
+        const kp = polar(cx, cy, R, k.pos-90);
+        const sp = polar(cx, cy, R, a.primary.pos-90);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        line.setAttribute('d', `M ${kp.x} ${kp.y} Q ${cx} ${cy} ${sp.x} ${sp.y}`);
+        line.setAttribute('fill', 'none');
+        line.setAttribute('stroke', '#4f6ef8');
+        line.setAttribute('stroke-opacity', '.5');
+        line.setAttribute('stroke-width', '1.5');
+        svg.appendChild(line);
+
+        if (showRep){
+          const reps = a.replicas.slice(1);
+          reps.forEach(r => {
+            const rp = polar(cx, cy, R, r.pos-90);
+            const l2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            l2.setAttribute('d', `M ${kp.x} ${kp.y} Q ${cx} ${cy} ${rp.x} ${rp.y}`);
+            l2.setAttribute('fill', 'none');
+            l2.setAttribute('stroke', '#a7b3d1');
+            l2.setAttribute('stroke-opacity', '.35');
+            l2.setAttribute('stroke-width', '1');
+            l2.setAttribute('stroke-dasharray', '4 4');
+            svg.appendChild(l2);
+          });
+        }
+      }
+
+      // servers
+      for (const s of sortedAllServers()){
+        const p = polar(cx, cy, R, s.pos-90);
+        const node = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        node.setAttribute('cx', p.x); node.setAttribute('cy', p.y); node.setAttribute('r', 8);
+        node.setAttribute('fill', s.up? '#5ee1a6' : '#ff6b6b');
+        node.setAttribute('stroke', '#0b1020'); node.setAttribute('stroke-width', '2');
+        svg.appendChild(node);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', p.x + 12); label.setAttribute('y', p.y + 4);
+        label.setAttribute('fill', s.up? '#e9eefb' : '#ff8585');
+        label.setAttribute('font-size', '12'); label.setAttribute('font-weight', '700');
+        label.textContent = `${s.id} @ ${s.pos}°`;
+        svg.appendChild(label);
+      }
+
+      // keys
+      for (const k of keys){
+        const p = polar(cx, cy, R, k.pos-90);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y); dot.setAttribute('r', 5);
+        dot.setAttribute('fill', '#7aa2f7'); dot.setAttribute('stroke', '#0b1020'); dot.setAttribute('stroke-width', '2');
+        svg.appendChild(dot);
+        if (showKeyLabels){
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', p.x + 8); label.setAttribute('y', p.y + 4);
+          label.setAttribute('fill', '#a7b3d1'); label.setAttribute('font-size', '11');
+          label.textContent = `${k.name} (${k.pos}°)`;
+          svg.appendChild(label);
+        }
+      }
+
+      // chips
+      renderServerChips();
+
+      // stats
+      statServers.textContent = servers.length;
+      statKeys.textContent = keys.length;
+    }
+
+    function renderServerChips(){
+      serverChips.innerHTML = '';
+      servers.sort((a,b)=>a.pos-b.pos).forEach(s=>{
+        const span = document.createElement('span');
+        span.className = 'server-chip';
+        span.innerHTML = `<span class="dot" style="background:${s.up?'#5ee1a6':'#ff6b6b'}"></span>${s.id} @ ${s.pos}°`;
+        serverChips.appendChild(span);
+      });
+      // populate select
+      serverSelect.innerHTML = servers.map((s,i)=>`<option value="${i}">${s.id} @ ${s.pos}° ${s.up?'(up)':'(down)'}</option>`).join('');
+    }
+
+    // --- Interactions ---
+    replicasRange.addEventListener('input', e=>{ replication = parseInt(e.target.value,10); replicasLabel.textContent = replication; draw(); });
+
+    addServerBtn.addEventListener('click', ()=>{
+      const id = (serverIdInput.value || nextServerId()).toUpperCase();
+      let pos = parseInt(serverPosInput.value,10);
+      if (Number.isNaN(pos)) pos = Math.floor(Math.random()*360);
+      mutateWithMovement(() => {
+        servers.push({ id, pos: clampDeg(pos), up: true });
+      });
+      serverIdInput.value = ''; serverPosInput.value = '';
+      draw();
+    });
+
+    addServerRandomBtn.addEventListener('click', ()=>{
+      const id = nextServerId();
+      const pos = Math.floor(Math.random()*360);
+      mutateWithMovement(() => {
+        servers.push({ id, pos, up: true });
+      });
+      draw();
+    });
+
+    removeServerBtn.addEventListener('click', ()=>{
+      const idx = serverSelect.selectedIndex;
+      if (idx>=0){
+        mutateWithMovement(() => {
+          servers.splice(idx,1);
+        });
+        draw();
+      }
+    });
+
+    toggleServerBtn.addEventListener('click', ()=>{
+      const idx = serverSelect.selectedIndex;
+      if (idx>=0){
+        mutateWithMovement(() => {
+          servers[idx].up = !servers[idx].up;
+        });
+        draw();
+      }
+    });
+
+    shuffleServersBtn.addEventListener('click', ()=>{
+      mutateWithMovement(() => {
+        servers.forEach(s=>{ s.pos = Math.floor(Math.random()*360); });
+      });
+      draw();
+    });
+
+    addKeyBtn.addEventListener('click', ()=>{
+      const name = (keyNameInput.value||'key_'+(keys.length+1)).trim();
+      const pos = hashToDeg(name);
+      keys.push({ name, pos });
+      keyNameInput.value = '';
+      draw();
+    });
+
+    addSampleKeysBtn.addEventListener('click', ()=>{
+      const N = 20;
+      for (let i=0;i<N;i++){
+        const name = sampleKey();
+        keys.push({ name, pos: hashToDeg(name) });
+      }
+      draw();
+    });
+
+    clearKeysBtn.addEventListener('click', ()=>{ keys = []; draw(); });
+    showReplicasChk.addEventListener('change', draw);
+    showKeyLabelsChk.addEventListener('change', draw);
+
+    function clampDeg(d){ d%=360; if (d<0) d+=360; return Math.round(d); }
+    function nextServerId(){
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (let i=0;i<letters.length;i++){
+        const id = letters[i];
+        if (!servers.find(s=>s.id===id)) return id;
+      }
+      return 'S'+(servers.length+1);
+    }
+
+    function sampleKey(){
+      const buckets = ['cart','profile','prefs','session','orders','wishlist','feed','cache','blob'];
+      const ns = ['user','tenant','org','shop','guest'];
+      const n = Math.floor(Math.random()*100000);
+      const k = buckets[Math.floor(Math.random()*buckets.length)];
+      const p = ns[Math.floor(Math.random()*ns.length)];
+      return `${p}_${n}_${k}`;
+    }
+
+    // Track movement on topology changes (servers up/down/add/remove/pos change)
+    function snapshotAssignments(){
+      lastAssignments.clear();
+      for (const k of keys){
+        const a = assignKey(k.name, k.pos);
+        lastAssignments.set(k.name, a.primary? a.primary.id : null);
+      }
+    }
+    function countMovements(){
+      let moved = 0;
+      for (const k of keys){
+        const prev = lastAssignments.get(k.name);
+        const now = assignKey(k.name, k.pos).primary;
+        const nowId = now? now.id : null;
+        if (prev !== undefined && prev !== nowId) moved++;
+      }
+      statMoved.textContent = moved;
+    }
+
+    function mutateWithMovement(fn){
+      snapshotAssignments();
+      fn();
+      // normalize positions unique per degree for neat rendering
+      servers = dedupePositions(servers);
+      countMovements();
+    }
+    function dedupePositions(arr){
+      // If two servers have same degree, nudge slightly
+      const used = new Set();
+      return arr.map(s=>{
+        let p = s.pos;
+        while (used.has(p)) p = clampDeg(p+1);
+        used.add(p);
+        return {...s, pos:p};
+      });
+    }
+
+    // --- Initial demo matching narrative ---
+    function init(){
+      // Three servers roughly spaced; add the example key
+      servers = [
+        {id:'A', pos:100, up:true},
+        {id:'B', pos:200, up:true},
+        {id:'C', pos:300, up:true},
+      ];
+      keys = [ { name: 'user_12345_cart', pos: hashToDeg('user_12345_cart') } ];
+      renderServerChips();
+      draw();
+    }
+
+    // Resize handling
+    let resizeObserver = new ResizeObserver(()=> draw());
+    resizeObserver.observe(document.body);
+
+    // Kickoff
+    init();
+  </script>
+</body>
+</html>
